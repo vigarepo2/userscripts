@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Pro IPTV & Media Device UA Spoofer
 // @namespace    http://tampermonkey.net/
-// @version      2.1.0
-// @description  Mobile-friendly User-Agent Spoofer for IPTV, Smart TVs, and Media Devices. Features touch-draggable UI, custom UAs, per-site toggles, and resolution/platform spoofing.
+// @version      2.2.0
+// @description  Fixed Mobile-friendly User-Agent Spoofer. Features touch-draggable UI, custom UAs, per-site toggles, and resolution/platform spoofing.
 // @author       Gemini
 // @match        *://*/*
 // @run-at       document-start
@@ -155,7 +155,7 @@
     const activeUA = getActiveUAData();
 
     // ==========================================
-    // 3. SPOOFING ENGINE
+    // 3. SPOOFING ENGINE (Runs Immediately)
     // ==========================================
     if (isEnabledForSite) {
         const spoofProp = (obj, prop, value) => {
@@ -199,16 +199,15 @@
     }
 
     // ==========================================
-    // 4. MOBILE-FRIENDLY UI INJECTION
+    // 4. SAFELY INJECT UI WHEN BODY IS READY
     // ==========================================
     function initUI() {
         if (document.getElementById('iptv-ua-pro-host')) return;
 
         const host = document.createElement('div');
         host.id = 'iptv-ua-pro-host';
-        // Base positioning for the dragging logic to hook into. Will be bottom-right.
-        host.style.cssText = 'position: fixed; z-index: 2147483647; width: 0; height: 0; top: 0; left: 0;';
-        document.documentElement.appendChild(host);
+        host.style.cssText = 'position: fixed; z-index: 2147483647; top: 0; left: 0; width: 0; height: 0; overflow: visible;';
+        document.body.appendChild(host);
 
         const shadow = host.attachShadow({ mode: 'open' });
 
@@ -217,8 +216,7 @@
                 --p-color: #6366f1;
                 --p-hover: #4f46e5;
                 --bg: rgba(15, 23, 42, 0.75);
-                --bg-solid: #0f172a;
-                --panel-bg: rgba(15, 23, 42, 0.92);
+                --panel-bg: rgba(15, 23, 42, 0.95);
                 --card-bg: rgba(30, 41, 59, 0.8);
                 --border: rgba(255, 255, 255, 0.1);
                 --text: #f8fafc;
@@ -227,37 +225,32 @@
                 --success: #10b981;
                 font-family: system-ui, -apple-system, sans-serif;
             }
-            
             * { box-sizing: border-box; }
             
-            /* Floating Button - Positioned absolutely relative to window using inline styles via JS */
+            /* Floating Button - Safe fixed fallback */
             .fab {
                 position: fixed;
+                bottom: 20px; right: 20px; /* Safe starting position */
                 width: 52px; height: 52px;
                 background: var(--bg);
                 backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-                border: 1px solid var(--border);
-                border-radius: 50%;
+                border: 1px solid var(--border); border-radius: 50%;
                 display: flex; align-items: center; justify-content: center;
-                cursor: grab;
-                box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+                cursor: grab; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
                 transition: transform 0.2s, border-color 0.2s;
-                user-select: none;
-                -webkit-tap-highlight-color: transparent;
+                user-select: none; -webkit-tap-highlight-color: transparent;
             }
             .fab:active { cursor: grabbing; transform: scale(0.95); }
             .fab svg { width: 24px; height: 24px; fill: none; stroke: var(--p-color); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none;}
             
-            /* Modal Panel - Centered on screen perfectly */
+            /* Modal Panel */
             .panel {
-                position: fixed;
-                top: 50%; left: 50%;
+                position: fixed; top: 50%; left: 50%;
                 width: 90vw; max-width: 400px;
                 height: 85vh; max-height: 600px;
                 background: var(--panel-bg);
                 backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-                border: 1px solid var(--border);
-                border-radius: 16px;
+                border: 1px solid var(--border); border-radius: 16px;
                 box-shadow: 0 25px 50px -12px rgba(0,0,0,0.7);
                 display: flex; flex-direction: column;
                 opacity: 0; pointer-events: none;
@@ -267,56 +260,39 @@
             }
             .panel.open { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%) scale(1); }
             
-            /* Header */
+            /* Structure Classes */
             .header { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); }
             .header-titles h2 { margin: 0; font-size: 16px; color: var(--text); font-weight: 600; }
             .header-titles p { margin: 4px 0 0 0; font-size: 11px; color: var(--text-muted); }
             .header-controls { display: flex; gap: 12px; align-items: center; }
-            
-            .btn-icon { background: transparent; border: none; padding: 6px; border-radius: 6px; cursor: pointer; color: var(--text-muted); transition: background 0.2s, color 0.2s; display:flex; align-items:center; justify-content:center;}
+            .btn-icon { background: transparent; border: none; padding: 6px; border-radius: 6px; cursor: pointer; color: var(--text-muted); display:flex; align-items:center; justify-content:center;}
             .btn-icon:hover { background: rgba(255,255,255,0.1); color: var(--text); }
             .btn-icon svg { width: 20px; height: 20px; fill: currentColor; }
-
-            /* Tabs */
             .tabs { display: flex; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.1); }
-            .tab { flex: 1; padding: 14px 0; text-align: center; color: var(--text-muted); font-size: 13px; font-weight: 600; cursor: pointer; transition: color 0.2s, box-shadow 0.2s; -webkit-tap-highlight-color: transparent;}
+            .tab { flex: 1; padding: 14px 0; text-align: center; color: var(--text-muted); font-size: 13px; font-weight: 600; cursor: pointer; -webkit-tap-highlight-color: transparent;}
             .tab:hover { color: var(--text); }
             .tab.active { color: var(--p-color); box-shadow: inset 0 -3px 0 var(--p-color); }
-            
-            /* Content Area */
             .content { flex: 1; overflow-y: auto; position: relative; padding-bottom: 20px; }
             .content::-webkit-scrollbar { width: 6px; }
             .content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
             .tab-pane { display: none; padding: 16px; }
             .tab-pane.active { display: block; animation: fadeIn 0.2s ease; }
             @keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
-            
-            /* Lists & Items */
-            .category-title { font-size: 12px; text-transform: uppercase; color: var(--p-color); margin: 20px 0 10px 4px; font-weight: 700; letter-spacing: 0.5px; }
-            .category-title:first-child { margin-top: 4px; }
-            
-            .ua-item { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px; transition: border-color 0.2s, background 0.2s; }
-            .ua-item:active { background: rgba(255,255,255,0.05); }
+            .category-title { font-size: 12px; text-transform: uppercase; color: var(--p-color); margin: 20px 0 10px 4px; font-weight: 700; }
+            .ua-item { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px; }
             .ua-item.active { border-color: var(--p-color); background: rgba(99, 102, 241, 0.15); }
-            
             .ua-header { display: flex; justify-content: space-between; align-items: center; }
             .ua-name { font-size: 14px; font-weight: 600; color: var(--text); cursor: pointer; flex: 1; }
             .ua-actions { display: flex; gap: 4px; }
-            
             .ua-meta { font-size: 11px; color: var(--text-muted); display: flex; gap: 8px; flex-wrap: wrap;}
             .badge { background: rgba(255,255,255,0.1); padding: 3px 8px; border-radius: 4px; }
-            
-            /* Forms (Mobile safe font-size 16px to prevent zoom) */
             .form-group { margin-bottom: 14px; }
             .form-group label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
-            .form-group input, .form-group textarea { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 12px; font-family: inherit; font-size: 16px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);}
+            .form-group input, .form-group textarea { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 12px; font-size: 16px; }
             .form-group input:focus, .form-group textarea:focus { outline: none; border-color: var(--p-color); }
-            
-            .btn { width: 100%; padding: 14px; background: var(--p-color); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
-            .btn:hover, .btn:active { background: var(--p-hover); }
+            .btn { width: 100%; padding: 14px; background: var(--p-color); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+            .btn:active { background: var(--p-hover); }
             .btn-outline { background: transparent; border: 1px solid var(--border); margin-top: 10px; }
-            
-            /* Toggles */
             .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 14px; background: var(--card-bg); border-radius: 10px; margin-bottom: 10px; border: 1px solid var(--border); }
             .toggle-label { font-size: 14px; color: var(--text); }
             .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
@@ -325,8 +301,6 @@
             .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
             input:checked + .slider { background-color: var(--success); }
             input:checked + .slider:before { transform: translateX(20px); }
-
-            /* Toasts */
             .toast-container { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 10px; pointer-events: none; z-index: 9999; }
             .toast { background: var(--success); color: white; padding: 10px 20px; border-radius: 30px; font-size: 13px; font-weight: 600; box-shadow: 0 8px 16px rgba(0,0,0,0.3); animation: slideUp 0.3s forwards, fadeOut 0.3s forwards 2.5s; }
             @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
@@ -341,14 +315,9 @@
             trash: `<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`
         };
 
-        // Initialize FAB Position (Bottom Right by default)
-        const initX = window.innerWidth - 70;
-        const initY = window.innerHeight - 70;
-
         shadow.innerHTML = `
             <style>${CSS}</style>
-            <div class="fab" id="fab" style="left: ${initX}px; top: ${initY}px;">${ICONS.tv}</div>
-            
+            <div class="fab" id="fab">${ICONS.tv}</div>
             <div class="panel" id="panel">
                 <div class="header">
                     <div class="header-titles">
@@ -356,23 +325,17 @@
                         <p id="statusText">${isEnabledForSite ? 'Active on ' + currentDomain : 'Disabled on ' + currentDomain}</p>
                     </div>
                     <div class="header-controls">
-                        <label class="switch" title="Toggle on this domain">
-                            <input type="checkbox" id="siteToggle" ${isEnabledForSite ? 'checked' : ''}>
-                            <span class="slider"></span>
-                        </label>
+                        <label class="switch"><input type="checkbox" id="siteToggle" ${isEnabledForSite ? 'checked' : ''}><span class="slider"></span></label>
                         <button class="btn-icon" id="closeBtn">${ICONS.close}</button>
                     </div>
                 </div>
-                
                 <div class="tabs">
                     <div class="tab active" data-target="pane-presets">Presets</div>
                     <div class="tab" data-target="pane-custom">Custom UAs</div>
                     <div class="tab" data-target="pane-settings">Settings</div>
                 </div>
-                
                 <div class="content">
                     <div class="tab-pane active" id="pane-presets"><div id="presetsList"></div></div>
-                    
                     <div class="tab-pane" id="pane-custom">
                         <div style="margin-bottom: 24px;">
                             <h3 class="category-title" style="margin-top:0;">Add Custom UA</h3>
@@ -387,7 +350,6 @@
                         <h3 class="category-title">Saved Custom UAs</h3>
                         <div id="customList"></div>
                     </div>
-                    
                     <div class="tab-pane" id="pane-settings">
                         <h3 class="category-title" style="margin-top:0;">General Settings</h3>
                         <div class="toggle-row"><span class="toggle-label">Global Enable</span><label class="switch"><input type="checkbox" id="globalToggle" ${state.globalEnable ? 'checked' : ''}><span class="slider"></span></label></div>
@@ -405,12 +367,10 @@
         const fab = shadow.getElementById('fab');
         const panel = shadow.getElementById('panel');
         const toastContainer = shadow.getElementById('toastContainer');
-        
+
         const showToast = (msg) => {
-            const t = document.createElement('div');
-            t.className = 'toast'; t.textContent = msg;
-            toastContainer.appendChild(t);
-            setTimeout(() => t.remove(), 3000);
+            const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
+            toastContainer.appendChild(t); setTimeout(() => t.remove(), 3000);
         };
 
         const buildItemHTML = (item, isCustom) => `
@@ -429,18 +389,14 @@
             </div>
         `;
 
-        // Render Lists
         shadow.getElementById('presetsList').innerHTML = PRESETS.map(cat => `<div class="category-title">${cat.category}</div>` + cat.items.map(i => buildItemHTML(i, false)).join('')).join('');
         
         const renderCustoms = () => {
-            const cList = shadow.getElementById('customList');
-            cList.innerHTML = state.customUAs.length ? state.customUAs.map(i => buildItemHTML(i, true)).join('') : `<div class="empty-state">No custom UAs saved.</div>`;
-        };
-        renderCustoms();
+            shadow.getElementById('customList').innerHTML = state.customUAs.length ? state.customUAs.map(i => buildItemHTML(i, true)).join('') : `<div class="empty-state">No custom UAs saved.</div>`;
+        }; renderCustoms();
 
-        // Event Listeners for Lists
         const handleListClick = (e) => {
-            if (e.target.closest('.copy-btn')) { navigator.clipboard.writeText(e.target.closest('.copy-btn').dataset.ua); return showToast('Copied to clipboard'); }
+            if (e.target.closest('.copy-btn')) { navigator.clipboard.writeText(e.target.closest('.copy-btn').dataset.ua); return showToast('Copied'); }
             if (e.target.closest('.del-btn')) {
                 const id = e.target.closest('.del-btn').dataset.id;
                 state.customUAs = state.customUAs.filter(i => i.id !== id);
@@ -455,7 +411,6 @@
         shadow.getElementById('presetsList').addEventListener('click', handleListClick);
         shadow.getElementById('customList').addEventListener('click', handleListClick);
 
-        // Custom UA Save
         shadow.getElementById('saveCustomBtn').addEventListener('click', () => {
             const name = shadow.getElementById('cName').value.trim(), ua = shadow.getElementById('cUa').value.trim();
             if (!name || !ua) return showToast('Name & UA required!');
@@ -466,14 +421,12 @@
             shadow.getElementById('cName').value = shadow.getElementById('cUa').value = shadow.getElementById('cPlatform').value = shadow.getElementById('cRes').value = '';
         });
 
-        // Tabs
         const tabs = shadow.querySelectorAll('.tab'), panes = shadow.querySelectorAll('.tab-pane');
         tabs.forEach(tab => tab.addEventListener('click', () => {
             tabs.forEach(t => t.classList.remove('active')); panes.forEach(p => p.classList.remove('active'));
             tab.classList.add('active'); shadow.getElementById(tab.dataset.target).classList.add('active');
         }));
 
-        // Toggles
         const handleToggle = (id, key, reload = true) => shadow.getElementById(id).addEventListener('change', e => {
             if (key === 'disabledSites') { e.target.checked ? state[key] = state[key].filter(d => d !== currentDomain) : (!state[key].includes(currentDomain) && state[key].push(currentDomain)); }
             else { state[key] = e.target.checked; }
@@ -481,23 +434,32 @@
         });
         handleToggle('siteToggle', 'disabledSites'); handleToggle('globalToggle', 'globalEnable'); handleToggle('resToggle', 'spoofResolution');
 
-        // Drag & Drop Logic (Touch + Mouse)
+        // Robust Drag Logic adapting from initial CSS positioning
         let isDragging = false, startX, startY, btnStartLeft, btnStartTop;
         const dragStart = (e) => {
             isDragging = false;
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
             startX = clientX; startY = clientY;
-            btnStartLeft = parseFloat(fab.style.left) || 0;
-            btnStartTop = parseFloat(fab.style.top) || 0;
+            
+            // Get exact current position before converting to absolute left/top coordinates
+            const rect = fab.getBoundingClientRect();
+            btnStartLeft = rect.left;
+            btnStartTop = rect.top;
+            
+            // Apply coordinates so it continues from exactly where it is being dragged
+            fab.style.left = `${btnStartLeft}px`; 
+            fab.style.top = `${btnStartTop}px`;
+            fab.style.bottom = 'auto'; 
+            fab.style.right = 'auto';
 
             const onMove = (me) => {
                 const mX = me.touches ? me.touches[0].clientX : me.clientX;
                 const mY = me.touches ? me.touches[0].clientY : me.clientY;
                 const dx = mX - startX, dy = mY - startY;
+                
                 if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
                     isDragging = true;
-                    // Clamp to screen edges
                     let newLeft = Math.max(0, Math.min(btnStartLeft + dx, window.innerWidth - 52));
                     let newTop = Math.max(0, Math.min(btnStartTop + dy, window.innerHeight - 52));
                     fab.style.left = `${newLeft}px`; fab.style.top = `${newTop}px`;
@@ -511,10 +473,16 @@
             document.addEventListener('mousemove', onMove); document.addEventListener('touchmove', onMove, {passive: false});
             document.addEventListener('mouseup', onEnd); document.addEventListener('touchend', onEnd);
         };
+        
         fab.addEventListener('mousedown', dragStart); fab.addEventListener('touchstart', dragStart, {passive: false});
         shadow.getElementById('closeBtn').addEventListener('click', () => panel.classList.remove('open'));
     }
 
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initUI);
-    else initUI();
+    // Wait until document body is reliably available before attaching UI to prevent errors
+    function safeInject() {
+        if (document.body) { initUI(); } 
+        else { requestAnimationFrame(safeInject); }
+    }
+    safeInject();
+
 })();
