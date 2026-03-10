@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Pro IPTV & Media Device UA Spoofer
 // @namespace    http://tampermonkey.net/
-// @version      2.0.0
-// @description  Advanced User-Agent Spoofer for IPTV, Smart TVs, and Media Devices. Features glassmorphism UI, custom UAs, per-site toggles, and resolution/platform spoofing.
+// @version      2.1.0
+// @description  Mobile-friendly User-Agent Spoofer for IPTV, Smart TVs, and Media Devices. Features touch-draggable UI, custom UAs, per-site toggles, and resolution/platform spoofing.
 // @author       Gemini
 // @match        *://*/*
 // @run-at       document-start
@@ -143,37 +143,29 @@
     }
 
     function getActiveUAData() {
-        // Search presets
         for (let cat of PRESETS) {
             let found = cat.items.find(i => i.id === state.activeId);
             if (found) return found;
         }
-        // Search customs
         let customFound = state.customUAs.find(i => i.id === state.activeId);
         if (customFound) return customFound;
-
-        // Fallback
         return PRESETS[0].items[0];
     }
 
     const activeUA = getActiveUAData();
 
     // ==========================================
-    // 3. SPOOFING ENGINE (Runs Immediately)
+    // 3. SPOOFING ENGINE
     // ==========================================
     if (isEnabledForSite) {
-        // A. Spoof Navigator
         const spoofProp = (obj, prop, value) => {
-            try {
-                Object.defineProperty(obj, prop, { get: () => value, configurable: true });
-            } catch (e) { /* Ignore strict mode blocks */ }
+            try { Object.defineProperty(obj, prop, { get: () => value, configurable: true }); } catch (e) {}
         };
 
         spoofProp(navigator, 'userAgent', activeUA.ua);
         spoofProp(navigator, 'appVersion', activeUA.ua.replace(/^Mozilla\//, ''));
         spoofProp(navigator, 'platform', activeUA.platform || 'Linux');
 
-        // B. Spoof Resolution (if enabled)
         if (state.spoofResolution && activeUA.res) {
             const [w, h] = activeUA.res;
             spoofProp(screen, 'width', w);
@@ -184,7 +176,6 @@
             spoofProp(window, 'innerHeight', h);
         }
 
-        // C. Spoof Fetch
         const originalFetch = window.fetch;
         window.fetch = async function(resource, config = {}) {
             config.headers = config.headers || {};
@@ -200,25 +191,23 @@
             return originalFetch.call(this, resource, config);
         };
 
-        // D. Spoof XHR
         const originalOpen = XMLHttpRequest.prototype.open;
         XMLHttpRequest.prototype.open = function() {
             originalOpen.apply(this, arguments);
-            try {
-                this.setRequestHeader('User-Agent', activeUA.ua);
-            } catch(e) {}
+            try { this.setRequestHeader('User-Agent', activeUA.ua); } catch(e) {}
         };
     }
 
     // ==========================================
-    // 4. UI INJECTION & GLASSMORPHISM
+    // 4. MOBILE-FRIENDLY UI INJECTION
     // ==========================================
     function initUI() {
         if (document.getElementById('iptv-ua-pro-host')) return;
 
         const host = document.createElement('div');
         host.id = 'iptv-ua-pro-host';
-        host.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 2147483647;';
+        // Base positioning for the dragging logic to hook into. Will be bottom-right.
+        host.style.cssText = 'position: fixed; z-index: 2147483647; width: 0; height: 0; top: 0; left: 0;';
         document.documentElement.appendChild(host);
 
         const shadow = host.attachShadow({ mode: 'open' });
@@ -229,8 +218,8 @@
                 --p-hover: #4f46e5;
                 --bg: rgba(15, 23, 42, 0.75);
                 --bg-solid: #0f172a;
-                --panel-bg: rgba(15, 23, 42, 0.85);
-                --card-bg: rgba(30, 41, 59, 0.6);
+                --panel-bg: rgba(15, 23, 42, 0.92);
+                --card-bg: rgba(30, 41, 59, 0.8);
                 --border: rgba(255, 255, 255, 0.1);
                 --text: #f8fafc;
                 --text-muted: #94a3b8;
@@ -241,8 +230,9 @@
             
             * { box-sizing: border-box; }
             
-            /* Floating Button */
+            /* Floating Button - Positioned absolutely relative to window using inline styles via JS */
             .fab {
+                position: fixed;
                 width: 52px; height: 52px;
                 background: var(--bg);
                 backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
@@ -252,119 +242,96 @@
                 cursor: grab;
                 box-shadow: 0 8px 32px rgba(0,0,0,0.5);
                 transition: transform 0.2s, border-color 0.2s;
-                position: absolute; right: 0; top: 0;
+                user-select: none;
+                -webkit-tap-highlight-color: transparent;
             }
-            .fab:active { cursor: grabbing; }
-            .fab:hover { transform: scale(1.05); border-color: var(--p-color); }
-            .fab svg { width: 24px; height: 24px; fill: none; stroke: var(--p-color); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+            .fab:active { cursor: grabbing; transform: scale(0.95); }
+            .fab svg { width: 24px; height: 24px; fill: none; stroke: var(--p-color); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none;}
             
-            /* Panel */
+            /* Modal Panel - Centered on screen perfectly */
             .panel {
-                position: absolute; top: 60px; right: 0;
-                width: 380px; height: 500px;
+                position: fixed;
+                top: 50%; left: 50%;
+                width: 90vw; max-width: 400px;
+                height: 85vh; max-height: 600px;
                 background: var(--panel-bg);
                 backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
                 border: 1px solid var(--border);
                 border-radius: 16px;
-                box-shadow: 0 16px 40px rgba(0,0,0,0.6);
+                box-shadow: 0 25px 50px -12px rgba(0,0,0,0.7);
                 display: flex; flex-direction: column;
                 opacity: 0; pointer-events: none;
-                transform: translateY(-10px) scale(0.98);
-                transition: opacity 0.3s ease, transform 0.3s ease;
+                transform: translate(-50%, -50%) scale(0.95);
+                transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
                 overflow: hidden;
             }
-            .panel.open { opacity: 1; pointer-events: auto; transform: translateY(0) scale(1); }
+            .panel.open { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%) scale(1); }
             
             /* Header */
-            .header {
-                padding: 16px; border-bottom: 1px solid var(--border);
-                display: flex; justify-content: space-between; align-items: center;
-                background: rgba(0,0,0,0.2);
-            }
+            .header { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); }
             .header-titles h2 { margin: 0; font-size: 16px; color: var(--text); font-weight: 600; }
             .header-titles p { margin: 4px 0 0 0; font-size: 11px; color: var(--text-muted); }
-            .header-controls { display: flex; gap: 8px; align-items: center; }
+            .header-controls { display: flex; gap: 12px; align-items: center; }
             
-            .btn-icon {
-                background: transparent; border: none; padding: 6px;
-                border-radius: 6px; cursor: pointer; color: var(--text-muted);
-                transition: background 0.2s, color 0.2s;
-            }
+            .btn-icon { background: transparent; border: none; padding: 6px; border-radius: 6px; cursor: pointer; color: var(--text-muted); transition: background 0.2s, color 0.2s; display:flex; align-items:center; justify-content:center;}
             .btn-icon:hover { background: rgba(255,255,255,0.1); color: var(--text); }
-            .btn-icon svg { width: 18px; height: 18px; fill: currentColor; }
+            .btn-icon svg { width: 20px; height: 20px; fill: currentColor; }
 
             /* Tabs */
             .tabs { display: flex; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.1); }
-            .tab {
-                flex: 1; padding: 12px 0; text-align: center;
-                color: var(--text-muted); font-size: 13px; font-weight: 500;
-                cursor: pointer; transition: color 0.2s, box-shadow 0.2s;
-            }
+            .tab { flex: 1; padding: 14px 0; text-align: center; color: var(--text-muted); font-size: 13px; font-weight: 600; cursor: pointer; transition: color 0.2s, box-shadow 0.2s; -webkit-tap-highlight-color: transparent;}
             .tab:hover { color: var(--text); }
-            .tab.active { color: var(--p-color); box-shadow: inset 0 -2px 0 var(--p-color); }
+            .tab.active { color: var(--p-color); box-shadow: inset 0 -3px 0 var(--p-color); }
             
             /* Content Area */
-            .content { flex: 1; overflow-y: auto; position: relative; }
+            .content { flex: 1; overflow-y: auto; position: relative; padding-bottom: 20px; }
             .content::-webkit-scrollbar { width: 6px; }
             .content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-            .tab-pane { display: none; padding: 12px; }
-            .tab-pane.active { display: block; }
+            .tab-pane { display: none; padding: 16px; }
+            .tab-pane.active { display: block; animation: fadeIn 0.2s ease; }
+            @keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
             
             /* Lists & Items */
-            .category-title { font-size: 11px; text-transform: uppercase; color: var(--p-color); margin: 16px 0 8px 4px; font-weight: 700; letter-spacing: 0.5px; }
+            .category-title { font-size: 12px; text-transform: uppercase; color: var(--p-color); margin: 20px 0 10px 4px; font-weight: 700; letter-spacing: 0.5px; }
             .category-title:first-child { margin-top: 4px; }
             
-            .ua-item {
-                background: var(--card-bg); border: 1px solid var(--border);
-                border-radius: 8px; padding: 12px; margin-bottom: 8px;
-                display: flex; flex-direction: column; gap: 6px;
-                transition: border-color 0.2s, background 0.2s;
-            }
-            .ua-item:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.2); }
-            .ua-item.active { border-color: var(--p-color); background: rgba(99, 102, 241, 0.1); }
+            .ua-item { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px; transition: border-color 0.2s, background 0.2s; }
+            .ua-item:active { background: rgba(255,255,255,0.05); }
+            .ua-item.active { border-color: var(--p-color); background: rgba(99, 102, 241, 0.15); }
             
             .ua-header { display: flex; justify-content: space-between; align-items: center; }
-            .ua-name { font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; flex: 1; }
+            .ua-name { font-size: 14px; font-weight: 600; color: var(--text); cursor: pointer; flex: 1; }
             .ua-actions { display: flex; gap: 4px; }
             
-            .ua-meta { font-size: 10px; color: var(--text-muted); display: flex; gap: 8px; }
-            .badge { background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; }
+            .ua-meta { font-size: 11px; color: var(--text-muted); display: flex; gap: 8px; flex-wrap: wrap;}
+            .badge { background: rgba(255,255,255,0.1); padding: 3px 8px; border-radius: 4px; }
             
-            /* Forms & Inputs */
-            .form-group { margin-bottom: 12px; }
-            .form-group label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
-            .form-group input, .form-group textarea {
-                width: 100%; background: rgba(0,0,0,0.2); border: 1px solid var(--border);
-                color: var(--text); border-radius: 6px; padding: 8px; font-family: inherit; font-size: 12px;
-            }
+            /* Forms (Mobile safe font-size 16px to prevent zoom) */
+            .form-group { margin-bottom: 14px; }
+            .form-group label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+            .form-group input, .form-group textarea { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 12px; font-family: inherit; font-size: 16px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);}
             .form-group input:focus, .form-group textarea:focus { outline: none; border-color: var(--p-color); }
             
-            .btn {
-                width: 100%; padding: 10px; background: var(--p-color); color: white;
-                border: none; border-radius: 6px; font-weight: 600; cursor: pointer;
-                transition: background 0.2s;
-            }
-            .btn:hover { background: var(--p-hover); }
-            .btn-outline { background: transparent; border: 1px solid var(--border); margin-top: 8px; }
-            .btn-outline:hover { background: rgba(255,255,255,0.1); }
-
+            .btn { width: 100%; padding: 14px; background: var(--p-color); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+            .btn:hover, .btn:active { background: var(--p-hover); }
+            .btn-outline { background: transparent; border: 1px solid var(--border); margin-top: 10px; }
+            
             /* Toggles */
-            .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--card-bg); border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--border); }
-            .toggle-label { font-size: 13px; color: var(--text); }
-            .switch { position: relative; display: inline-block; width: 36px; height: 20px; }
+            .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 14px; background: var(--card-bg); border-radius: 10px; margin-bottom: 10px; border: 1px solid var(--border); }
+            .toggle-label { font-size: 14px; color: var(--text); }
+            .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
             .switch input { opacity: 0; width: 0; height: 0; }
-            .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.1); transition: .4s; border-radius: 20px; }
-            .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: var(--text-muted); transition: .4s; border-radius: 50%; }
+            .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.2); transition: .4s; border-radius: 24px; }
+            .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
             input:checked + .slider { background-color: var(--success); }
-            input:checked + .slider:before { transform: translateX(16px); background-color: white; }
+            input:checked + .slider:before { transform: translateX(20px); }
 
             /* Toasts */
-            .toast-container { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; pointer-events: none; z-index: 100; }
-            .toast { background: var(--success); color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.3); animation: slideUp 0.3s forwards, fadeOut 0.3s forwards 2.5s; }
-            @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+            .toast-container { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 10px; pointer-events: none; z-index: 9999; }
+            .toast { background: var(--success); color: white; padding: 10px 20px; border-radius: 30px; font-size: 13px; font-weight: 600; box-shadow: 0 8px 16px rgba(0,0,0,0.3); animation: slideUp 0.3s forwards, fadeOut 0.3s forwards 2.5s; }
+            @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
             @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
-
-            .empty-state { text-align: center; color: var(--text-muted); font-size: 12px; padding: 30px 0; }
+            .empty-state { text-align: center; color: var(--text-muted); font-size: 13px; padding: 40px 0; }
         `;
 
         const ICONS = {
@@ -374,9 +341,13 @@
             trash: `<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`
         };
 
+        // Initialize FAB Position (Bottom Right by default)
+        const initX = window.innerWidth - 70;
+        const initY = window.innerHeight - 70;
+
         shadow.innerHTML = `
             <style>${CSS}</style>
-            <div class="fab" id="fab" title="Open UA Spoofer">${ICONS.tv}</div>
+            <div class="fab" id="fab" style="left: ${initX}px; top: ${initY}px;">${ICONS.tv}</div>
             
             <div class="panel" id="panel">
                 <div class="header">
@@ -400,16 +371,14 @@
                 </div>
                 
                 <div class="content">
-                    <div class="tab-pane active" id="pane-presets">
-                        <div id="presetsList"></div>
-                    </div>
+                    <div class="tab-pane active" id="pane-presets"><div id="presetsList"></div></div>
                     
                     <div class="tab-pane" id="pane-custom">
-                        <div style="margin-bottom: 20px;">
-                            <h3 class="category-title">Add Custom UA</h3>
+                        <div style="margin-bottom: 24px;">
+                            <h3 class="category-title" style="margin-top:0;">Add Custom UA</h3>
                             <div class="form-group"><input type="text" id="cName" placeholder="Device Name (e.g. My Smart TV)"></div>
                             <div class="form-group"><textarea id="cUa" rows="3" placeholder="Mozilla/5.0..."></textarea></div>
-                            <div style="display:flex; gap:8px;">
+                            <div style="display:flex; gap:12px;">
                                 <div class="form-group" style="flex:1;"><input type="text" id="cPlatform" placeholder="Platform (e.g. Linux)"></div>
                                 <div class="form-group" style="flex:1;"><input type="text" id="cRes" placeholder="Res (e.g. 1920x1080)"></div>
                             </div>
@@ -420,52 +389,28 @@
                     </div>
                     
                     <div class="tab-pane" id="pane-settings">
-                        <h3 class="category-title">General Settings</h3>
-                        <div class="toggle-row">
-                            <span class="toggle-label">Global Enable</span>
-                            <label class="switch"><input type="checkbox" id="globalToggle" ${state.globalEnable ? 'checked' : ''}><span class="slider"></span></label>
-                        </div>
-                        <div class="toggle-row">
-                            <span class="toggle-label">Spoof Screen Resolution</span>
-                            <label class="switch"><input type="checkbox" id="resToggle" ${state.spoofResolution ? 'checked' : ''}><span class="slider"></span></label>
-                        </div>
-                        
+                        <h3 class="category-title" style="margin-top:0;">General Settings</h3>
+                        <div class="toggle-row"><span class="toggle-label">Global Enable</span><label class="switch"><input type="checkbox" id="globalToggle" ${state.globalEnable ? 'checked' : ''}><span class="slider"></span></label></div>
+                        <div class="toggle-row"><span class="toggle-label">Spoof Resolution</span><label class="switch"><input type="checkbox" id="resToggle" ${state.spoofResolution ? 'checked' : ''}><span class="slider"></span></label></div>
                         <h3 class="category-title">Data Management</h3>
                         <button class="btn btn-outline" id="exportBtn">Export Config (JSON)</button>
-                        <button class="btn btn-outline" id="importBtn" style="margin-top: 8px;">Import Config</button>
+                        <button class="btn btn-outline" id="importBtn">Import Config</button>
                         <input type="file" id="importFile" accept=".json" style="display:none;">
                     </div>
                 </div>
-                
                 <div class="toast-container" id="toastContainer"></div>
             </div>
         `;
 
-        // Elements
-        const panel = shadow.getElementById('panel');
         const fab = shadow.getElementById('fab');
-        const presetsList = shadow.getElementById('presetsList');
-        const customList = shadow.getElementById('customList');
+        const panel = shadow.getElementById('panel');
         const toastContainer = shadow.getElementById('toastContainer');
-
-        // Helpers
+        
         const showToast = (msg) => {
             const t = document.createElement('div');
-            t.className = 'toast';
-            t.textContent = msg;
+            t.className = 'toast'; t.textContent = msg;
             toastContainer.appendChild(t);
             setTimeout(() => t.remove(), 3000);
-        };
-
-        const copyText = (text) => {
-            navigator.clipboard.writeText(text);
-            showToast('Copied to clipboard');
-        };
-
-        const applyUA = (id) => {
-            state.activeId = id;
-            saveState();
-            window.location.reload();
         };
 
         const buildItemHTML = (item, isCustom) => `
@@ -473,8 +418,8 @@
                 <div class="ua-header">
                     <div class="ua-name" data-id="${item.id}">${item.name}</div>
                     <div class="ua-actions">
-                        <button class="btn-icon copy-btn" data-ua="${item.ua}" title="Copy UA">${ICONS.copy}</button>
-                        ${isCustom ? `<button class="btn-icon del-btn" data-id="${item.id}" title="Delete" style="color:var(--danger)">${ICONS.trash}</button>` : ''}
+                        <button class="btn-icon copy-btn" data-ua="${item.ua}">${ICONS.copy}</button>
+                        ${isCustom ? `<button class="btn-icon del-btn" data-id="${item.id}" style="color:var(--danger)">${ICONS.trash}</button>` : ''}
                     </div>
                 </div>
                 <div class="ua-meta">
@@ -484,180 +429,92 @@
             </div>
         `;
 
-        // Render Presets
-        let pHTML = '';
-        PRESETS.forEach(cat => {
-            pHTML += `<div class="category-title">${cat.category}</div>`;
-            cat.items.forEach(item => { pHTML += buildItemHTML(item, false); });
-        });
-        presetsList.innerHTML = pHTML;
-
-        // Render Customs
+        // Render Lists
+        shadow.getElementById('presetsList').innerHTML = PRESETS.map(cat => `<div class="category-title">${cat.category}</div>` + cat.items.map(i => buildItemHTML(i, false)).join('')).join('');
+        
         const renderCustoms = () => {
-            if (state.customUAs.length === 0) {
-                customList.innerHTML = `<div class="empty-state">No custom UAs saved yet.</div>`;
-                return;
-            }
-            customList.innerHTML = state.customUAs.map(item => buildItemHTML(item, true)).join('');
+            const cList = shadow.getElementById('customList');
+            cList.innerHTML = state.customUAs.length ? state.customUAs.map(i => buildItemHTML(i, true)).join('') : `<div class="empty-state">No custom UAs saved.</div>`;
         };
         renderCustoms();
 
-        // Event Delegation for Lists (Click to activate, copy, delete)
+        // Event Listeners for Lists
         const handleListClick = (e) => {
-            const copyBtn = e.target.closest('.copy-btn');
-            if (copyBtn) return copyText(copyBtn.getAttribute('data-ua'));
-
-            const delBtn = e.target.closest('.del-btn');
-            if (delBtn) {
-                const id = delBtn.getAttribute('data-id');
+            if (e.target.closest('.copy-btn')) { navigator.clipboard.writeText(e.target.closest('.copy-btn').dataset.ua); return showToast('Copied to clipboard'); }
+            if (e.target.closest('.del-btn')) {
+                const id = e.target.closest('.del-btn').dataset.id;
                 state.customUAs = state.customUAs.filter(i => i.id !== id);
                 if (state.activeId === id) state.activeId = 'p_sam_1';
-                saveState();
-                renderCustoms();
-                showToast('Custom UA Deleted');
-                return;
+                saveState(); renderCustoms(); return showToast('Deleted');
             }
-
-            const nameDiv = e.target.closest('.ua-name');
-            if (nameDiv) applyUA(nameDiv.getAttribute('data-id'));
+            if (e.target.closest('.ua-name')) {
+                state.activeId = e.target.closest('.ua-name').dataset.id;
+                saveState(); window.location.reload();
+            }
         };
-        presetsList.addEventListener('click', handleListClick);
-        customList.addEventListener('click', handleListClick);
+        shadow.getElementById('presetsList').addEventListener('click', handleListClick);
+        shadow.getElementById('customList').addEventListener('click', handleListClick);
 
-        // Add Custom UA Logic
+        // Custom UA Save
         shadow.getElementById('saveCustomBtn').addEventListener('click', () => {
-            const name = shadow.getElementById('cName').value.trim();
-            const ua = shadow.getElementById('cUa').value.trim();
-            const plat = shadow.getElementById('cPlatform').value.trim() || 'Linux';
-            const resStr = shadow.getElementById('cRes').value.trim();
-            
-            if (!name || !ua) return showToast('Name and UA are required!');
-            
-            let res = null;
-            if (resStr.includes('x')) {
-                const parts = resStr.split('x');
-                res = [parseInt(parts[0]), parseInt(parts[1])];
-            }
-
-            const newId = 'c_' + Date.now();
-            state.customUAs.push({ id: newId, name, ua, platform: plat, res });
-            saveState();
-            
-            // clear inputs
-            shadow.getElementById('cName').value = '';
-            shadow.getElementById('cUa').value = '';
-            shadow.getElementById('cPlatform').value = '';
-            shadow.getElementById('cRes').value = '';
-            
-            renderCustoms();
-            showToast('Custom UA Saved');
-        });
-
-        // Toggles
-        shadow.getElementById('siteToggle').addEventListener('change', (e) => {
-            if (e.target.checked) {
-                state.disabledSites = state.disabledSites.filter(d => d !== currentDomain);
-            } else {
-                if (!state.disabledSites.includes(currentDomain)) state.disabledSites.push(currentDomain);
-            }
-            saveState();
-            window.location.reload();
-        });
-
-        shadow.getElementById('globalToggle').addEventListener('change', (e) => {
-            state.globalEnable = e.target.checked;
-            saveState();
-            window.location.reload();
-        });
-
-        shadow.getElementById('resToggle').addEventListener('change', (e) => {
-            state.spoofResolution = e.target.checked;
-            saveState();
-            window.location.reload();
+            const name = shadow.getElementById('cName').value.trim(), ua = shadow.getElementById('cUa').value.trim();
+            if (!name || !ua) return showToast('Name & UA required!');
+            let res = null, resStr = shadow.getElementById('cRes').value.trim();
+            if (resStr.includes('x')) res = [parseInt(resStr.split('x')[0]), parseInt(resStr.split('x')[1])];
+            state.customUAs.push({ id: 'c_' + Date.now(), name, ua, platform: shadow.getElementById('cPlatform').value.trim() || 'Linux', res });
+            saveState(); renderCustoms(); showToast('Saved');
+            shadow.getElementById('cName').value = shadow.getElementById('cUa').value = shadow.getElementById('cPlatform').value = shadow.getElementById('cRes').value = '';
         });
 
         // Tabs
-        const tabs = shadow.querySelectorAll('.tab');
-        const panes = shadow.querySelectorAll('.tab-pane');
-        tabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                tabs.forEach(t => t.classList.remove('active'));
-                panes.forEach(p => p.classList.remove('active'));
-                tab.classList.add('active');
-                shadow.getElementById(tab.getAttribute('data-target')).classList.add('active');
-            });
-        });
+        const tabs = shadow.querySelectorAll('.tab'), panes = shadow.querySelectorAll('.tab-pane');
+        tabs.forEach(tab => tab.addEventListener('click', () => {
+            tabs.forEach(t => t.classList.remove('active')); panes.forEach(p => p.classList.remove('active'));
+            tab.classList.add('active'); shadow.getElementById(tab.dataset.target).classList.add('active');
+        }));
 
-        // Import / Export
-        shadow.getElementById('exportBtn').addEventListener('click', () => {
-            const data = JSON.stringify(state, null, 2);
-            const blob = new Blob([data], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'iptv-ua-config.json';
-            a.click();
-            URL.revokeObjectURL(url);
-            showToast('Config Exported');
+        // Toggles
+        const handleToggle = (id, key, reload = true) => shadow.getElementById(id).addEventListener('change', e => {
+            if (key === 'disabledSites') { e.target.checked ? state[key] = state[key].filter(d => d !== currentDomain) : (!state[key].includes(currentDomain) && state[key].push(currentDomain)); }
+            else { state[key] = e.target.checked; }
+            saveState(); if(reload) window.location.reload();
         });
+        handleToggle('siteToggle', 'disabledSites'); handleToggle('globalToggle', 'globalEnable'); handleToggle('resToggle', 'spoofResolution');
 
-        const importFile = shadow.getElementById('importFile');
-        shadow.getElementById('importBtn').addEventListener('click', () => importFile.click());
-        importFile.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                try {
-                    const parsed = JSON.parse(event.target.result);
-                    if (parsed.activeId !== undefined) {
-                        state = { ...state, ...parsed };
-                        saveState();
-                        showToast('Import successful. Reloading...');
-                        setTimeout(() => window.location.reload(), 1500);
-                    } else {
-                        showToast('Invalid JSON config');
-                    }
-                } catch (err) {
-                    showToast('Error parsing file');
-                }
-            };
-            reader.readAsText(file);
-        });
-
-        // FAB Drag & Open Logic
-        let isDragging = false, startX, startY, initTop, initRight;
-        fab.addEventListener('mousedown', (e) => {
+        // Drag & Drop Logic (Touch + Mouse)
+        let isDragging = false, startX, startY, btnStartLeft, btnStartTop;
+        const dragStart = (e) => {
             isDragging = false;
-            startX = e.clientX; startY = e.clientY;
-            const rect = host.getBoundingClientRect();
-            initTop = rect.top;
-            initRight = window.innerWidth - rect.right;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            startX = clientX; startY = clientY;
+            btnStartLeft = parseFloat(fab.style.left) || 0;
+            btnStartTop = parseFloat(fab.style.top) || 0;
 
             const onMove = (me) => {
-                const dx = me.clientX - startX;
-                const dy = me.clientY - startY;
-                if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+                const mX = me.touches ? me.touches[0].clientX : me.clientX;
+                const mY = me.touches ? me.touches[0].clientY : me.clientY;
+                const dx = mX - startX, dy = mY - startY;
+                if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
                     isDragging = true;
-                    host.style.top = `${initTop + dy}px`;
-                    host.style.right = `${initRight - dx}px`;
+                    // Clamp to screen edges
+                    let newLeft = Math.max(0, Math.min(btnStartLeft + dx, window.innerWidth - 52));
+                    let newTop = Math.max(0, Math.min(btnStartTop + dy, window.innerHeight - 52));
+                    fab.style.left = `${newLeft}px`; fab.style.top = `${newTop}px`;
                 }
             };
-            const onUp = () => {
-                document.removeEventListener('mousemove', onMove);
-                document.removeEventListener('mouseup', onUp);
+            const onEnd = () => {
+                document.removeEventListener('mousemove', onMove); document.removeEventListener('touchmove', onMove);
+                document.removeEventListener('mouseup', onEnd); document.removeEventListener('touchend', onEnd);
                 if (!isDragging) panel.classList.toggle('open');
             };
-            document.addEventListener('mousemove', onMove);
-            document.addEventListener('mouseup', onUp);
-        });
-
+            document.addEventListener('mousemove', onMove); document.addEventListener('touchmove', onMove, {passive: false});
+            document.addEventListener('mouseup', onEnd); document.addEventListener('touchend', onEnd);
+        };
+        fab.addEventListener('mousedown', dragStart); fab.addEventListener('touchstart', dragStart, {passive: false});
         shadow.getElementById('closeBtn').addEventListener('click', () => panel.classList.remove('open'));
     }
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initUI);
-    } else {
-        initUI();
-    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initUI);
+    else initUI();
 })();
